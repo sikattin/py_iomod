@@ -12,6 +12,8 @@
 import os
 import re
 import codecs
+import json
+
 
 class RWFile:
     """RWFile"""
@@ -27,9 +29,12 @@ class RWFile:
     def read_text_file(self, dir_path: str, encode=None):
         """ファイルを読み込んで空白行を削除した文字列群をリストに格納し返す.
 
+        行頭が -, #, /* で始まる行(コメント行)の場合は、その行は返却するリストに含めない。
+
         :param dir_path: ディレクトリパス.
         :param encode: 文字エンコーディングの指定 デフォルトはUTF-8.
         """
+        comment_flag = False
         if encode is None:
             encode = 'utf_8'
         # 挿入文字列を格納しておくリスト
@@ -42,7 +47,19 @@ class RWFile:
                 for line in file:
                     if line in {'\n', '\r', '\r\n' }:
                         continue
-                    elif self.is_matched(line=line, search_objs=["^-+", "^#+"]):
+                    elif self.is_matched(line=line.rstrip(), search_objs=["^-+", "^#+"]):
+                        continue
+                    elif self.is_matched(line=line.rstrip(), search_objs=["^(/\*).*(\*/)$"]):
+                        continue
+                    elif self.is_matched(line=line.rstrip(), search_objs=["^/\*"]) \
+                        and comment_flag == False:
+                        comment_flag = True
+                        continue
+                    elif self.is_matched(line=line.rstrip(), search_objs=["\*/$"]) \
+                        and comment_flag == True:
+                        comment_flag = False
+                        continue
+                    elif comment_flag == True:
                         continue
                     else:
                         joined_strs = self.join_lines(line)
@@ -70,8 +87,6 @@ class RWFile:
             print("存在しない、または無効な値です。")
             raise e
         else:
-            print("==========================================\n")
-            print("Complete loading a file.\n")
             return ins_str
 
     def is_matched(self, line: str, search_objs: list):
@@ -79,7 +94,7 @@ class RWFile:
 
         Args:
             param1 line: テキストファイル1行分にあたる文字列.
-            param2 search_obj: 捜索パターン.
+            param2 search_obj: 捜索パターン. 正規表現可.
 
         Returns:
             パターンにマッチしたならTrue そうでないならFalseを返す.
@@ -182,29 +197,42 @@ class RWFile:
 class ParseJSON(object):
     """class ParseJSON"""
 
-    import json
-
-    def __init__(self, path: str):
+    def __init__(self):
         """class ParseJSON Constructor
 
         Args:
             param1 path: json file path.
         """
-        self.file = open(file=path, mode='r')
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.file.close()
-
-    def load_json(self):
+    def load_json(self, file: str):
         """load json file.
+
+        Args:
+            param1 file: json file path.
 
         Returns:
             parsed object.(dict)
+
+        Raises:
+            FileNotFoundError
         """
-        dec_obj = json.loads(file.read())
-        return dec_obj
+        with open(file=file, mode='r') as f:
+            dec_obj = json.loads(f.read())
+            return dec_obj
 
+    def out_json(self, file: str, content: str):
+        """output the specified file in json format.
 
+        Args:
+            param1 file: output file path.(.json)
+            param2 content: content of json file. it must be string data.
+
+        Returns:
+            file size of output file.
+
+        Raises:
+            FileNotFoundError
+            json.JSONDecodeError(msg, doc, pos)
+        """
+        with open(file=file, mode="w") as f:
+            return f.write(json.dumps(content, sort_keys=True, indent=4))
