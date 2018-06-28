@@ -13,7 +13,7 @@ with open('LICENSE') as f:
 
 setup(
     name='iomod',
-    version='1.0',
+    version='1.1',
     description='related input/output module.',
     author='shikano takeki',
     author_email='shikano.takeki@nexon.co.jp',
