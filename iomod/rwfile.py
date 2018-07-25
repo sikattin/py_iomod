@@ -20,6 +20,9 @@ SQL_COMMENT_MULTI_START = "/\*"
 SQL_COMMENT_MULTI_END = "\*/"
 SQL_DELIMITER = ";"
 SQL_DELIMITER_STATEMENT = "DELIMITER"
+SQL_BEGIN_STATEMENT = "BEGIN"
+SQL_END_STATEMENT = "END"
+
 
 class RWFile:
     """RWFile"""
@@ -124,20 +127,12 @@ class RWFile:
         regexp_multicomment_end = "{}$".format(SQL_COMMENT_MULTI_END)
 
         if encoding is None:
-            encoding = 'utf_8'
-
-        if self.is_utf8_with_bom(path):
-            encoding = 'utf-8-sig'
-        else:
-            encoding = 'utf_8'
+            encoding = 'utf_8_sig'
         try:
             with codecs.open(r"{}".format(path), mode="r", encoding=encoding) as f:
                 for line in f:
                     # 改行文字のみの行は空行とみなす。
                     if line in {'\n', '\r', '\r\n'}:
-                        continue
-                    # 複数行のコメント中(comment_flag = Trueのとき)は返却リストに含めない。
-                    elif comment_flag is True:
                         continue
                     elif self.is_matched(line=line.rstrip(), search_objs=[regexp_singlecomment]):
                         continue
@@ -153,6 +148,9 @@ class RWFile:
                         comment_flag = False
                         continue
                     elif self.is_matched(line=line.rstrip(), search_objs=[regexp_multicomment]):
+                        continue
+                    # 複数行のコメント中(comment_flag = Trueのとき)は返却リストに含めない。
+                    elif comment_flag is True:
                         continue
                     else:
                         # コメント行 及び 空行 以外だった時の処理
@@ -194,16 +192,20 @@ class RWFile:
         Returns:
             tuple()
         """
+        if delimiter is None:
+            delimiter = SQL_DELIMITER
         ret = tuple()
         tmp_lines = list()
         split_line = list()
         regexp_delimiter = ".*{}.+".format(SQL_DELIMITER_STATEMENT)
-        if delimiter is None:
-            delimiter = SQL_DELIMITER
+        regexp_begin = ".*{}.*".format(SQL_BEGIN_STATEMENT)
+        regexp_end = ".*{0}((\s)|(\t))*{1}".format(SQL_END_STATEMENT, re.escape(delimiter))
+        regexp_forreplace_end = "{0}((\s)|(\t))*{1}".format(SQL_END_STATEMENT, re.escape(delimiter))
+        is_begin_statement = False
         for line in lines:
             if self.is_matched(line=line, search_objs=[regexp_delimiter]):
                 try:
-                    split_line = line.split()
+                    split_line = line.rstrip().split()
                     idx = split_line.index(SQL_DELIMITER_STATEMENT)
                 except ValueError as e:
                     try:
@@ -217,9 +219,27 @@ class RWFile:
                     raise
                 else:
                     delimiter = split_line[idx + 1]
-            split_line = line.rstrip().split()
-            tmp_lines.append(' '.join(split_line))
-            if line[(len(line) - len(delimiter))::] == delimiter:
+                    regexp_end = ".*{0}((\s)|(\t))*{1}".format(SQL_END_STATEMENT, re.escape(delimiter))
+                    regexp_forreplace_end = "{0}((\s)|(\t))*{1}".format(SQL_END_STATEMENT, re.escape(delimiter))
+                    if len(split_line) > 2:
+                        split_line.pop(idx + 1)
+                        split_line.pop(idx)
+                    else:
+                        continue
+            elif self.is_matched(line=line, search_objs=[regexp_begin]):
+                is_begin_statement = True
+            elif self.is_matched(line=line, search_objs=[regexp_end])and \
+            is_begin_statement is True:
+                is_begin_statement = False
+            tmp_lines.append(' '.join(line.rstrip().split()))
+            print("line= {0}, delimiter= {1}, is_begin_statement= {2}, delstate= {3}".format(line.rstrip(),
+                                                                                             delimiter,
+                                                                                             is_begin_statement,
+                                                                                             line.rstrip()[(len(line) - len(delimiter))::]))
+            if line.rstrip()[(len(line) - len(delimiter))::] == delimiter and \
+            is_begin_statement is False:
+                if self.is_matched(line=line, search_objs=[regexp_end]):
+                    tmp_lines[len(tmp_lines) - 1] = re.sub(regexp_forreplace_end, '{0} {1}'.format(SQL_END_STATEMENT, SQL_DELIMITER), line)
                 ret += (' '.join(tmp_lines), )
                 tmp_lines = list()
         return ret
@@ -228,7 +248,7 @@ class RWFile:
         """文字コード UTF-8 のテキストファイルが BOM ありかどうかを判別する"""
         with codecs.open(path, mode="r", encoding="utf-8") as f:
             first_line = (f.readline()).rstrip()
-            if first_line == "\ufeff":
+            if self._is_matched(line=first_line, search_objs=["^\ufeff"]):
                 return True
             else:
                 return False
