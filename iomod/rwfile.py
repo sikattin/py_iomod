@@ -232,10 +232,7 @@ class RWFile:
             is_begin_statement is True:
                 is_begin_statement = False
             tmp_lines.append(' '.join(line.rstrip().split()))
-            print("line= {0}, delimiter= {1}, is_begin_statement= {2}, delstate= {3}".format(line.rstrip(),
-                                                                                             delimiter,
-                                                                                             is_begin_statement,
-                                                                                             line.rstrip()[(len(line) - len(delimiter))::]))
+
             if line.rstrip()[(len(line) - len(delimiter))::] == delimiter and \
             is_begin_statement is False:
                 if self.is_matched(line=line, search_objs=[regexp_end]):
