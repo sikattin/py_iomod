@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-# Learn more: https://github.com/kennethreitz/setup.py
 
 from setuptools import setup, find_packages
 
@@ -14,9 +13,9 @@ with open('LICENSE') as f:
 setup(
     name='iomod',
     version='1.1',
-    description='related input/output module.',
-    author='shikano takeki',
-    author_email='shikano.takeki@nexon.co.jp',
+    description='read/write text file module',
+    author='Takeki Shikano',
+    author_email='',
     url=None,
     license='MIT',
     packages=find_packages(exclude=('tests', 'docs'))
